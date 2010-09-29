@@ -2,22 +2,27 @@ require "resque"
 
 class ResqueReconnect
   extend(Module.new do
-    attr_reader :server_lambda
-    def server(&block)
-      @server_lambda = block
-    end
-
-    def reconnect
-      Resque.redis = server_lambda.call
+    def reconnect(redis_server)
+      Resque.redis = redis_server
     end
   end)
 
-  def initialize(app)
+  attr_reader :redis_server_getter
+  def initialize(app, redis_server_getter)
     @app = app
+    @redis_server_getter = redis_server_getter
   end
 
   def call(env)
-    self.class.reconnect
+    self.class.reconnect(redis_server)
     @app.call(env)
+  end
+
+  def redis_server
+    if redis_server_getter.is_a?(Proc)
+      redis_server_getter.call
+    else
+      redis_server_getter
+    end
   end
 end
